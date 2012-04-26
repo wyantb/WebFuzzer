@@ -35,6 +35,17 @@ defaultParameters = [
 	"access_token"
 ]
 
+defaultArgs = [
+	"admin",
+
+	# Basic XSS
+	"<script>document.write(\"XSS PROBLEM\");</script>",
+
+	# Basic SQL Injection
+	"admin') --",
+	""
+]
+
 if __name__ == '__main__':
 	print("Actions:")
 	print(defaultActions)
