@@ -3,6 +3,7 @@ baseUrl = ""
 debug = True
 
 defaultActions = [
+	# The defaults of MVC2/3
 	"",
 	"Home",
 	"Account",
@@ -12,7 +13,15 @@ defaultActions = [
 	"Account/ChangePassword",
 	"Account/ChangePasswordSuccess",
 	"Home/Index",
-	"Home/About"
+	"Home/About",
+
+	# Some extras for WebEng to fuzz
+	"Home/UpdateStatus",
+	"Photos",
+	"Calendar",
+	"Stock",
+	"Stock/List",
+	"Stock/Add"
 ]
 
 defaultParameters = [
@@ -22,7 +31,8 @@ defaultParameters = [
 	"UserName",
 	"Password",
 	"RememberMe",
-	"Email"
+	"Email",
+	"access_token"
 ]
 
 if __name__ == '__main__':
