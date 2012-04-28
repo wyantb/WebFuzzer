@@ -11,7 +11,7 @@ from collections import deque
 
 import settings
 
-def get_children(url):
+def get_children(url, count=0):
 	"""
 	Queue all the valid links referenced on this page.
 
@@ -24,7 +24,8 @@ def get_children(url):
 	soup = BeautifulSoup(response.text)
 
 	# Dump response to a file
-	filename = "%s/%d.html" % (settings.output_dir, time())
+	filename = "%s/%d.html" % (settings.output_dir, count)
+	count += 1
 	resp_dump = open(filename, "w")
 	try:
 		resp_dump.write(response.text)
@@ -61,11 +62,13 @@ if __name__ == "__main__":
 	queue = settings.default_actions
 	visited = []
 	root = settings.base_url
+	count = 0
 
 	while len(queue) > 0:
+		count += 1
 		url = queue.pop()
 		visited.append(url)
-		children = get_children(url)
+		children = get_children(url, count)
 		for child in children:
 			if child not in visited:
 				queue.append(child)
