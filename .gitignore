@@ -5,4 +5,5 @@ build/*
 *.orig
 *.rej
 *.pyc
+settings_user.py
 
