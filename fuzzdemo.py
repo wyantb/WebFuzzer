@@ -5,6 +5,7 @@
 #
 
 import requests
+import settings
 from bs4 import BeautifulSoup
 from collections import deque
 
@@ -53,3 +54,25 @@ if __name__ == "__main__":
 			if child not in visited:
 				queue.append(child)
 	print visited
+
+def find_forms(url):
+	response = requests.get(root % url)
+	soup = BeautifulSoup(response.text)
+	return soup.find_all("form")
+	
+def fuzz_form(form):
+	import urllib
+
+	params = {}
+	for input in form.find_all("input"):
+		if 'user' in input['name']:
+			val = 'admin'
+		elif 'password' in input['type']:
+			val = 'password'
+		else:
+			val = "<script>document.write(\"XSS PROBLEM\");</script>"
+		params[input['name']] = val # trash value that should be determined based on input type
+	
+	data = urllib.urlencode(params)
+
+	return requests.get(settings.base_url % ("?" + data))
