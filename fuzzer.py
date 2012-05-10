@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
 	queue = settings.default_actions
 	visited = []
-	formFields = []
+	formFields = settings.default_parameters
 	root = settings.base_url
 	count = 0
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 		for form in soup.find_all("form"):
 			for field in form.find_all("input"):
 				if field not in formFields:
-					formFields.append(field)
+					formFields.append(field['name'])
 	
 	print formFields
 	print visited
