@@ -39,7 +39,7 @@ def get_children(url, count=0):
 		if check_prefixes(atag):
 			children.append(atag['href'])
 		
-	return children
+	return soup, children
 
 def check_prefixes(atag):
 	"""
@@ -61,6 +61,7 @@ if __name__ == "__main__":
 
 	queue = settings.default_actions
 	visited = []
+	formFields = []
 	root = settings.base_url
 	count = 0
 
@@ -68,9 +69,14 @@ if __name__ == "__main__":
 		count += 1
 		url = queue.pop()
 		visited.append(url)
-		children = get_children(url, count)
+		soup, children = get_children(url, count)
 		for child in children:
 			if child not in visited:
 				queue.append(child)
+		for form in soup.find_all("form"):
+			for field in form.find_all("input"):
+				if field not in formFields:
+					formFields.append(field)
+	
+	print formFields
 	print visited
-
