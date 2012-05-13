@@ -6,25 +6,29 @@ import requests
 from urlparse import urlparse
 from bs4 import BeautifulSoup
 
-urldict = {}
+target = None
+visited = []
+crawlqueue = []
+paramdict = {}
 
-def add_to_dict(url):
-	global urldict
-	if url not in urldict:
-		urldict[url] = {}
-		
+def append_to_visited(url):
+	visited.append(url)
+
+def append_to_queue(url):
+	if url not in visited and url not in crawlqueue:
+		crawlqueue.append(url)
+
 def add_to_params(url, type, param):
-	global urldict
-	if url in urldict:
-		tuple = urldict[url]
-		if type not in tuple:
-			tuple[type] = []
-		tuple[type].append(param)
+	if url not in paramdict:
+		paramdict[url] = {}
+	tuple = paramdict[url]
+	if type not in tuple:
+		tuple[type] = []
+	tuple[type].append(param)
 
 def analyze_inputs(url):
-	# Check the target location
+	# Check the target location (deprecate?)
 	if valid_target(url):
-		add_to_dict(url)
 		# Obtain the GET inputs
 		query = urlparse(url).query
 		if query:
@@ -40,22 +44,46 @@ def analyze_inputs(url):
 			# Check the post target location
 			target = convert_to_abs(url, form['action'])
 			if valid_target(target):
-				add_to_dict(target)
 				for input in form.find_all("input"):
 					add_to_params(target, "post", input['name'])
+					
+def children_of_page(url):
+	result = []
+	content = requests.get(url)
+	content = BeautifulSoup(content.text)
+	for link in content.find_all("a"):
+		if 'href' in link.attrs:
+			absurl = convert_to_abs(url, link['href'])
+			if valid_target(absurl):
+				result.append(absurl)
+	return result
 				
+def crawl_recursively():
+	if crawlqueue:
+		url = crawlqueue.pop()
+		analyze_inputs(url)
+		for child in children_of_page(url):
+			append_to_queue(child)
+		append_to_visited(url)
+		crawl_recursively()
+	else:
+		print visited
+		
 def convert_to_abs(parent, child):
-	child = urlparse(child)
-	parent = urlparse(parent)
-	if not child.netloc:
+	parsedChild = urlparse(child)
+	parsedParent = urlparse(parent)
+	if not parsedChild.netloc:
 		# This is a relative URL, convert it
-		return parent.scheme + "://" + parent.netloc + child.path + child.query
+		extra  = ""
+		if not parsedChild.path.startswith('/'):
+			extra = "/"
+		return (parsedParent.scheme + "://" + parsedParent.netloc + extra +
+				parsedChild.path + parsedChild.query)
 	else:
 		# This was an absolute URL, return it
 		return child
 				
 def valid_target(url):
-	global target
 	location = urlparse(url).netloc
 	if location == target:
 		return True
@@ -70,5 +98,6 @@ def set_target(url):
 if __name__ == "__main__":
 	if(len(sys.argv) > 1):
 		set_target(sys.argv[1])
-		analyze_inputs(sys.argv[1])
-		print urldict
+		append_to_queue(sys.argv[1])
+		crawl_recursively()
+		# analyze_inputs(sys.argv[1])
