@@ -2,6 +2,7 @@
 import re
 import sys
 import time
+import copy
 import requests
 import settings
 
@@ -21,16 +22,16 @@ def append_to_queue(url):
 	if url not in visited and url not in crawlqueue:
 		crawlqueue.append(url)
 
-def add_to_params(url, type, param):
+def add_to_params(url, type, param, value):
 	url = urlparse(url)
 	url = url.scheme + "://" + url.netloc + url.path
 	if url not in paramdict:
 		paramdict[url] = {}
 	tuple = paramdict[url]
 	if type not in tuple:
-		tuple[type] = []
+		tuple[type] = {}
 	if param not in tuple[type]:
-		tuple[type].append(param)
+		tuple[type][param] = value
 
 def analyze_inputs(url):
 	# Check the target location (deprecate?)
@@ -41,8 +42,10 @@ def analyze_inputs(url):
 			query = query.split('&')
 			# Get only the names, not the values
 			for tuple in query:
-				param = tuple.split('=')[0]
-				add_to_params(url, "get", param)
+				split = tuple.split('=')
+				param = split[0]
+				value = split[1]
+				add_to_params(url, "get", param, value)
 		# Obtain the forms on this page
 		content = session.get(url)
 		if content.headers['content-type'].startswith('text'):
@@ -63,7 +66,7 @@ def analyze_inputs(url):
 					for input in form.find_all("input"):
 						# Weed out dummy inputs
 						if 'name' in input.attrs:
-							add_to_params(target, method, input['name'])
+							add_to_params(target, method, input['name'], "")
 					
 def children_of_page(url):
 	result = []
@@ -87,26 +90,44 @@ def crawl_recursively():
 				append_to_queue(child)
 			time.sleep(settings.wait_time)
 			crawl_recursively()
-	else:
-		print paramdict
 
-def check_sanitization(url):
-	for evilstring in settings.sanitize_checks:
-		for paramtype, params in paramdict[url].items():
-			content = None
-			payload = {}
-			for param in params:
-				payload[param] = evilstring
-			if(paramtype == "get"):
-				content = session.get(url, params=payload)
-			elif(paramtype == "post"):
-				content = session.post(url, params=payload)
-			if evilstring in content.text:
-				print evilstring + " unsanitized in " + url, payload
-
-def fuzz_all_urls():
+def fuzz_all():
 	for url in paramdict:
-		check_sanitization(url)
+		fuzz_test(url)
+
+def fuzz_test(url):
+	# Iterate over each test
+	for name, test in settings.fuzz_tests.items():
+		# Iterate over types
+		for type, params in paramdict[url].items():
+			# Iterate over each parameter
+			for param in params:
+				fail = False
+				result = None
+				payload = copy.copy(params)
+				payload[param] = test["vector"]
+				if type == "get":
+					result = session.get(url, params=payload)
+				else:
+					result = session.post(url, data=payload)
+				for string in test["fail_results"]:
+					if string in result.text:
+						fail = True
+				if fail:
+					print "-"*80
+					print test["fail_message"] % (type.upper(), url, param)
+
+def print_attack_surface():
+	print "=" * 80
+	print "Attack Surface:"
+	print "=" * 80
+	for url, types in paramdict.items():
+		print ">"*80
+		print url
+		for type, params in types.items():
+			print type.upper()
+			for param, value in params.items():
+				print "%s (Default: %s)" % (param,value)
 				
 def valid_target(url):
 	location = urlparse(url).netloc
@@ -142,4 +163,6 @@ if __name__ == "__main__":
 		# Crawl
 		crawl_recursively()
 		# Fuzz
-		fuzz_all_urls()
+		fuzz_all()
+		# Print human readable attack surface
+		print_attack_surface()
