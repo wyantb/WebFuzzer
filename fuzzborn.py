@@ -91,6 +91,17 @@ def crawl_recursively():
 			time.sleep(settings.wait_time)
 			crawl_recursively()
 
+def guess_pages():
+	if settings.page_guessing:
+		for page in settings.guess_pages:
+			url = urljoin(target, page)
+			result = session.get(url)
+			if result.status_code == 200:
+				append_to_queue(url)
+
+def guess_passwords():
+	return
+
 def fuzz_all():
 	for url in paramdict:
 		fuzz_test(url)
@@ -160,6 +171,8 @@ if __name__ == "__main__":
 		login()
 		# Add the given page to the queue
 		append_to_queue(sys.argv[1])
+		# Guess pages
+		guess_pages()
 		# Crawl
 		crawl_recursively()
 		# Fuzz
