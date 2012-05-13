@@ -3,13 +3,11 @@
 # Demonstration of how to walk the links on a webpage with
 # requests and BeautifulSoup4.
 #
-
+import config
 import requests
 from time import time
 from bs4 import BeautifulSoup
 from collections import deque
-
-import settings
 
 def get_children(url, count=0):
 	"""
