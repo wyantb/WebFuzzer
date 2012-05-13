@@ -3,6 +3,7 @@
 # Demonstration of how to walk the links on a webpage with
 # requests and BeautifulSoup4.
 #
+import sys
 import config
 import requests
 from time import time
@@ -56,7 +57,9 @@ def check_prefixes(atag):
 	return False
 
 if __name__ == "__main__":
-
+	if(len(sys.argv) > 1):
+		print sys.argv[1]
+	"""
 	queue = settings.default_actions
 	visited = []
 	formFields = settings.default_parameters
@@ -78,3 +81,4 @@ if __name__ == "__main__":
 	
 	print formFields
 	print visited
+	"""
