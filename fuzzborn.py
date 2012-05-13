@@ -75,6 +75,7 @@ def crawl_recursively():
 		analyze_inputs(url)
 		for child in children_of_page(url):
 			append_to_queue(child)
+		print crawlqueue
 		crawl_recursively()
 	else:
 		print paramdict
@@ -85,10 +86,14 @@ def convert_to_abs(parent, child):
 	if not parsedChild.netloc:
 		# This is a relative URL, convert it
 		extra  = ""
+		extra2 = ""
 		if not parsedChild.path.startswith('/'):
-			extra = "/"
+			extra = parsedParent.path + "/"
+		if parsedChild.query:
+			if not parsedChild.query.startswith('?'):
+				extra2 = "?"
 		return (parsedParent.scheme + "://" + parsedParent.netloc + extra +
-				parsedChild.path + parsedChild.query)
+				parsedChild.path + extra2 + parsedChild.query)
 	else:
 		# This was an absolute URL, return it
 		return child
