@@ -2,8 +2,9 @@
 import re
 import sys
 import requests
+import settings
 
-from urlparse import urlparse
+from urlparse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 target = None
@@ -45,16 +46,22 @@ def analyze_inputs(url):
 		if content.headers['content-type'].startswith('text'):
 			content = BeautifulSoup(content.text)
 			for form in content.find_all("form"):
+				method = None
+				# Check the post method
+				if 'method' in form.attrs:
+					method = form['method'].lower()
+				else:
+					method = "get"
 				# Check the post target location
 				if 'action' in form.attrs:
-					target = convert_to_abs(url, form['action'])
+					target = urljoin(url, form['action'])
 				else:
 					target = url
 				if valid_target(target):
 					for input in form.find_all("input"):
 						# Weed out dummy inputs
 						if 'name' in input.attrs:
-							add_to_params(target, "post", input['name'])
+							add_to_params(target, method, input['name'])
 					
 def children_of_page(url):
 	result = []
@@ -63,7 +70,7 @@ def children_of_page(url):
 		content = BeautifulSoup(content.text)
 		for link in content.find_all("a"):
 			if 'href' in link.attrs:
-				absurl = convert_to_abs(url, link['href'])
+				absurl = urljoin(url, link['href'])
 				if valid_target(absurl):
 					result.append(absurl)
 	return result
@@ -75,28 +82,27 @@ def crawl_recursively():
 		analyze_inputs(url)
 		for child in children_of_page(url):
 			append_to_queue(child)
-		print crawlqueue
 		crawl_recursively()
 	else:
 		print paramdict
-		
-def convert_to_abs(parent, child):
-	parsedChild = urlparse(child)
-	parsedParent = urlparse(parent)
-	if not parsedChild.netloc:
-		# This is a relative URL, convert it
-		extra  = ""
-		extra2 = ""
-		if not parsedChild.path.startswith('/'):
-			extra = parsedParent.path + "/"
-		if parsedChild.query:
-			if not parsedChild.query.startswith('?'):
-				extra2 = "?"
-		return (parsedParent.scheme + "://" + parsedParent.netloc + extra +
-				parsedChild.path + extra2 + parsedChild.query)
-	else:
-		# This was an absolute URL, return it
-		return child
+
+def check_sanitization(url):
+	for evilstring in settings.sanitize_checks:
+		for paramtype, params in paramdict[url].items():
+			content = None
+			payload = {}
+			for param in params:
+				payload[param] = evilstring
+			if(paramtype == "get"):
+				content = requests.get(url, params=payload)
+			elif(paramtype == "post"):
+				content = requests.post(url, params=payload)
+			if evilstring in content.text:
+				print evilstring + " unsanitized in " + url, payload
+
+def fuzz_all_urls():
+	for url in paramdict:
+		check_sanitization(url)
 				
 def valid_target(url):
 	location = urlparse(url).netloc
@@ -115,4 +121,4 @@ if __name__ == "__main__":
 		set_target(sys.argv[1])
 		append_to_queue(sys.argv[1])
 		crawl_recursively()
-		# analyze_inputs(sys.argv[1])
+		fuzz_all_urls()
