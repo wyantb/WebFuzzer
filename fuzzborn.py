@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import re
 import sys
+import time
 import requests
 import settings
 
@@ -8,6 +9,7 @@ from urlparse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 target = None
+session = None
 visited = []
 crawlqueue = []
 paramdict = {}
@@ -42,7 +44,7 @@ def analyze_inputs(url):
 				param = tuple.split('=')[0]
 				add_to_params(url, "get", param)
 		# Obtain the forms on this page
-		content = requests.get(url)
+		content = session.get(url)
 		if content.headers['content-type'].startswith('text'):
 			content = BeautifulSoup(content.text)
 			for form in content.find_all("form"):
@@ -65,7 +67,7 @@ def analyze_inputs(url):
 					
 def children_of_page(url):
 	result = []
-	content = requests.get(url)
+	content = session.get(url)
 	if content.headers['content-type'].startswith('text'):
 		content = BeautifulSoup(content.text)
 		for link in content.find_all("a"):
@@ -80,9 +82,11 @@ def crawl_recursively():
 		url = crawlqueue.pop(0)
 		append_to_visited(url)
 		analyze_inputs(url)
-		for child in children_of_page(url):
-			append_to_queue(child)
-		crawl_recursively()
+		if settings.page_discovery:
+			for child in children_of_page(url):
+				append_to_queue(child)
+			time.sleep(settings.wait_time)
+			crawl_recursively()
 	else:
 		print paramdict
 
@@ -94,9 +98,9 @@ def check_sanitization(url):
 			for param in params:
 				payload[param] = evilstring
 			if(paramtype == "get"):
-				content = requests.get(url, params=payload)
+				content = session.get(url, params=payload)
 			elif(paramtype == "post"):
-				content = requests.post(url, params=payload)
+				content = session.post(url, params=payload)
 			if evilstring in content.text:
 				print evilstring + " unsanitized in " + url, payload
 
@@ -116,9 +120,26 @@ def set_target(url):
 	# Obtain the domain
 	target = urlparse(url).netloc
 
+def login():
+	if settings.attempt_login:
+		login_data = settings.login_data
+		if login_data["rtype"] == "get":
+			session.get(login_data["url"], login_data["data"])
+		else:
+			session.post(login_data["url"], login_data["data"])
+		
+
 if __name__ == "__main__":
 	if(len(sys.argv) > 1):
+		# Create a session
+		session = requests.session()
+		# Set the target
 		set_target(sys.argv[1])
+		# Attempt to login
+		login()
+		# Add the given page to the queue
 		append_to_queue(sys.argv[1])
+		# Crawl
 		crawl_recursively()
+		# Fuzz
 		fuzz_all_urls()
