@@ -14,6 +14,10 @@ session = None
 visited = []
 crawlqueue = []
 paramdict = {}
+sensitive = []
+
+def append_to_sensitive(url):
+	sensitive.append(url)
 
 def append_to_visited(url):
 	visited.append(url)
@@ -49,6 +53,9 @@ def analyze_inputs(url):
 		# Obtain the forms on this page
 		content = session.get(url)
 		if content.headers['content-type'].startswith('text'):
+			for stuff in settings.sensitive_data:
+				if stuff in content.text:
+					append_to_sensitive(url)
 			content = BeautifulSoup(content.text)
 			for form in content.find_all("form"):
 				method = None
@@ -71,7 +78,10 @@ def analyze_inputs(url):
 def children_of_page(url):
 	result = []
 	content = session.get(url)
-	if content.headers['content-type'].startswith('text'):
+	if content.status_code != 200:
+		print "-"*80
+		print "Suspicious code " + content.status_code + " at " + url 
+	elif content.headers['content-type'].startswith('text'):
 		content = BeautifulSoup(content.text)
 		for link in content.find_all("a"):
 			if 'href' in link.attrs:
@@ -139,13 +149,20 @@ def fuzz_test(url):
 							result = session.get(url, params=payload)
 						else:
 							result = session.post(url, data=payload)
-						if 'fail_results' in test:
-							for string in test["fail_results"]:
-								if string in result.text:
-									fail = True
-							if fail:
-								print "-"*80
-								print test["fail_message"] % (type.upper(), url, param)
+						if result.status_code == 200:
+							for stuff in settings.sensitive_data:
+								if stuff in result.text:
+									append_to_sensitive(url)
+							if 'fail_results' in test:
+								for string in test["fail_results"]:
+									if string in result.text:
+										fail = True
+								if fail:
+									print "-"*80
+									print test["fail_message"] % (type.upper(), url, param)
+						else:
+							print "-"*80
+							print "Suspicious code %s on %s request on %s with %s = %s" % (result.status_code, type.upper(), url, param, vector)
 
 def print_attack_surface():
 	print "=" * 80
@@ -204,6 +221,10 @@ if __name__ == "__main__":
 		fuzz_all()
 		# Print human readable attack surface
 		print_attack_surface()
+		# Print urls with sensitive data
+		if sensitive:
+			print "Sensitive data disclosed on:"
+			print sensitive
 	else:
 		print "Usage: %s [target]" % (sys.argv[0])
 		print "Don't forget the trailing slash!"
