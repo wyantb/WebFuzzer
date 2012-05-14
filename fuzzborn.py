@@ -100,7 +100,18 @@ def guess_pages():
 				append_to_queue(url)
 
 def guess_passwords():
-	return
+	if settings.pass_guessing:
+		for u,p in settings.guess_passwords.items():
+			payload = {}
+			data = settings.login_data
+			url = urljoin(target, data["url"])
+			keys = data["data"].keys()
+			payload[keys[0]] = u
+			payload[keys[1]] = p
+			if data["rtype"] == "get":
+				requests.get(url, params=payload)
+			else:
+				requests.post(url, data=payload)
 
 def fuzz_all():
 	for url in paramdict:
@@ -121,12 +132,13 @@ def fuzz_test(url):
 					result = session.get(url, params=payload)
 				else:
 					result = session.post(url, data=payload)
-				for string in test["fail_results"]:
-					if string in result.text:
-						fail = True
-				if fail:
-					print "-"*80
-					print test["fail_message"] % (type.upper(), url, param)
+				if 'fail_results' in test:
+					for string in test["fail_results"]:
+						if string in result.text:
+							fail = True
+					if fail:
+						print "-"*80
+						print test["fail_message"] % (type.upper(), url, param)
 
 def print_attack_surface():
 	print "=" * 80
@@ -155,10 +167,11 @@ def set_target(url):
 def login():
 	if settings.attempt_login:
 		login_data = settings.login_data
+		url = urljoin(target, login_data["url"])
 		if login_data["rtype"] == "get":
-			session.get(login_data["url"], login_data["data"])
+			session.get(url, login_data["data"])
 		else:
-			session.post(login_data["url"], login_data["data"])
+			session.post(url, login_data["data"])
 		
 
 if __name__ == "__main__":
@@ -167,10 +180,12 @@ if __name__ == "__main__":
 		session = requests.session()
 		# Set the target
 		set_target(sys.argv[1])
-		# Attempt to login
-		login()
 		# Add the given page to the queue
 		append_to_queue(sys.argv[1])
+		# Attempt to login
+		login()
+		# Guess passwords
+		guess_passwords()
 		# Guess pages
 		guess_pages()
 		# Crawl
